@@ -1,0 +1,27 @@
+{
+  "_comment": "OPA-style capability policy (CLAUDE.md §8). Agents may NOT edit this file (§3). The Python policy engine (workflows/lib/policy.py) and the Rust control-plane both enforce these rules; this document is the data they share.",
+  "forbidden_path_globs": [
+    ".keystone/policies/*",
+    "**/.keystone/policies/*",
+    "secrets/*",
+    "**/secrets/*",
+    "*.pem",
+    "*.key",
+    "**/id_rsa*"
+  ],
+  "valid_capabilities": ["read_files", "write_files", "delete_files", "run_tests", "network"],
+  "rules": {
+    "no_editing_policies": "Deny write/delete to any forbidden_path_globs.",
+    "no_secrets": "Deny touching secrets and key material.",
+    "no_network_in_airgap": "Deny capability 'network' while airgap is on (§11).",
+    "no_self_skill": "Deny activating a skill created in the current run (§10).",
+    "no_edit_under_test": "Deny editing a file currently held by a test-env lease (§3, §5).",
+    "bulk_delete_needs_approval": "Deny deleting more than max_delete_without_approval files without human approval.",
+    "scope_required": "Every mutated path must match the token's scope (§8)."
+  },
+  "defaults": {
+    "max_delete_without_approval": 5,
+    "capability_ttl_minutes": 30,
+    "airgap": true
+  }
+}

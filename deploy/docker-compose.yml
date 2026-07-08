@@ -1,0 +1,159 @@
+# KeyStoneOS — local air-gapped backplane
+# Single-workstation deployment. No outbound network by default.
+#
+# Bring up:   docker compose up -d
+# Health:     docker compose ps
+#
+# NOTE: pin every image to a digest before going air-gapped, and pre-pull into a
+# local registry. Tags below are for first bring-up on a networked machine; the
+# import station then mirrors them offline. See CLAUDE.md §11.
+
+name: keystoneos
+
+networks:
+  # Internal plane: services talk to each other, NOT to the internet.
+  keystone-internal:
+    driver: bridge
+    internal: true
+  # Edge plane: ONLY the UI/control-plane + Gitea sit here for localhost access.
+  keystone-edge:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  gitea-data:
+  qdrant-data:
+  memgraph-data:
+  ollama-models:
+  artifact-store:
+
+services:
+  # ---- Durable orchestration -------------------------------------------------
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: temporal
+      POSTGRES_PASSWORD: temporal
+      POSTGRES_DB: temporal
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    networks: [keystone-internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U temporal"]
+      interval: 10s
+      retries: 5
+
+  temporal:
+    image: temporalio/auto-setup:1.25
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DB: postgres12
+      DB_PORT: 5432
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres
+    networks: [keystone-internal]
+    ports: ["7233:7233"]   # gRPC, bound to localhost in production
+
+  temporal-ui:
+    image: temporalio/ui:2.30.0
+    depends_on: [temporal]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+    networks: [keystone-internal, keystone-edge]
+    ports: ["8233:8080"]
+
+  # ---- Event transport (telemetry + UI fan-out ONLY) -------------------------
+  nats:
+    image: nats:2.10
+    command: ["-js"]        # JetStream on
+    networks: [keystone-internal]
+    ports: ["4222:4222"]
+
+  # ---- Source of truth -------------------------------------------------------
+  gitea:
+    image: gitea/gitea:1.22
+    environment:
+      GITEA__server__OFFLINE_MODE: "true"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+    volumes: [gitea-data:/data]
+    networks: [keystone-internal, keystone-edge]
+    ports: ["3000:3000"]
+
+  # ---- Inference -------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    volumes: [ollama-models:/root/.ollama]
+    networks: [keystone-internal]
+    ports: ["11434:11434"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ---- Knowledge stores ------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    volumes: [qdrant-data:/qdrant/storage]
+    networks: [keystone-internal]
+    ports: ["6333:6333"]
+
+  memgraph:
+    image: memgraph/memgraph-mage:latest
+    command: ["--telemetry-enabled=false"]   # airgap: no phone-home
+    volumes: [memgraph-data:/var/lib/memgraph]
+    networks: [keystone-internal]
+    ports: ["7687:7687"]
+
+  cognee:
+    image: cognee/cognee:latest
+    environment:
+      # Point Cognee at the SHARED stores. Do NOT let it spin up its own.
+      VECTOR_DB_PROVIDER: qdrant
+      VECTOR_DB_URL: http://qdrant:6333
+      GRAPH_DB_PROVIDER: memgraph
+      GRAPH_DB_URL: bolt://memgraph:7687
+      LLM_PROVIDER: ollama
+      LLM_ENDPOINT: http://ollama:11434
+    depends_on: [qdrant, memgraph, ollama]
+    networks: [keystone-internal]
+
+  # ---- Sandbox execution -----------------------------------------------------
+  # OpenHands runs containers itself; it needs the Docker socket. ISOLATE IT:
+  # its spawned task-containers use `network: none` (enforced in the worker, not
+  # here). This service is the controller only.
+  openhands:
+    image: docker.all-hands.dev/all-hands-ai/openhands:latest
+    environment:
+      SANDBOX_RUNTIME_CONTAINER_IMAGE: docker.all-hands.dev/all-hands-ai/runtime:latest
+      SANDBOX_USER_ID: "1000"
+      WORKSPACE_MOUNT_PATH: /opt/workspace_base
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - artifact-store:/opt/workspace_base
+    networks: [keystone-internal]
+
+  # ---- Control plane + workers (build locally; see /control-plane, /workers) --
+  control-plane:
+    build: ../control-plane
+    depends_on: [temporal, nats, gitea]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      NATS_URL: nats://nats:4222
+      GITEA_URL: http://gitea:3000
+    networks: [keystone-internal, keystone-edge]
+    ports: ["8080:8080"]   # WebSocket state stream to the Tauri UI
+
+  workers:
+    build: ../workers
+    depends_on: [temporal, ollama, qdrant, memgraph, cognee, openhands]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      OLLAMA_URL: http://ollama:11434
+      QDRANT_URL: http://qdrant:6333
+      MEMGRAPH_URL: bolt://memgraph:7687
+      OPENHANDS_URL: http://openhands:3000
+    networks: [keystone-internal]

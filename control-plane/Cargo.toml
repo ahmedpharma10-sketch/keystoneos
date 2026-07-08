@@ -1,0 +1,17 @@
+[package]
+name = "keystone-control-plane"
+version = "0.1.0"
+edition = "2021"
+description = "KeyStoneOS control plane (CLAUDE.md §1): WebSocket state stream, lease manager, model router."
+
+[[bin]]
+name = "control-plane"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.7", features = ["ws"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"

@@ -1,0 +1,19 @@
+# CANDIDATE skill (CLAUDE.md §7). Captured green-only by Hermes. NOT activated —
+# promotion is gated: candidate -> static review -> historical run -> synthetic
+# failure -> human/QA gate -> versioned commit -> activated for matching triggers.
+name: reject-alg-none
+status: candidate          # never "active" in the run that created it (§10)
+version: 0
+trigger:
+  error_fingerprint_like: "InvalidToken*alg*none"
+  language: python
+summary: >
+  Reject JWTs presenting alg=none (and malformed tokens) in verify_token().
+diff_template: |
+  - return jwt.decode(token, KEY, algorithms=[header["alg"]])
+  + if header.get("alg", "").lower() == "none":
+  +     raise InvalidToken("unsigned tokens are rejected")
+  + return jwt.decode(token, KEY, algorithms=["HS256"])
+provenance:
+  mission: ks-20260629-001
+  captured_on_green: true

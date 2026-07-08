@@ -1,0 +1,15 @@
+# Node / Vite (apps/desktop)
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Rust (control-plane)
+target/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Runtime state (the ledger seed is kept; live appends are not)
+.keystone/*.cache

@@ -1,0 +1,3 @@
+{"ts": "2026-06-29T04:07:00Z", "mission": "ks-20260629-001", "event": "mission_started", "request": "Reject JWTs with alg=none in verify_token()"}
+{"ts": "2026-06-29T04:07:22Z", "mission": "ks-20260629-001", "event": "skill_candidate", "activated": false, "skill": "reject-alg-none"}
+{"ts": "2026-06-29T04:07:23Z", "mission": "ks-20260629-001", "event": "mission_complete", "commit": "a1b2c3d", "attempts": 2}

@@ -1,0 +1,9 @@
+# KeyStoneOS Python workers (CLAUDE.md §1). Stdlib covers HTTP (urllib) and git
+# (subprocess); only Temporal is required to run the worker. Tool SDKs are added
+# per integration point as they are wired in.
+temporalio>=1.7,<2
+
+# --- Optional: Graph-RAG ingest (§6). The pipeline runs offline on .txt/.md/.json
+# without these; install to enable PDF/scan parsing and LLM-grade extraction.
+# mineru>=2            # opendatalab/MinerU — doc/scan -> clean Markdown (Stage 1)
+# hyper-extract        # yifanfeng97/Hyper-Extract — text -> KG/hypergraph (Stage 2)
