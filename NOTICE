@@ -1,0 +1,16 @@
+KeyStoneOS
+Copyright (c) 2026 Ahmed Mabrok — MIT License (see LICENSE).
+
+This product bundles third-party material under compatible open-source licenses:
+
+- The Agency agent roster (apps/desktop/public/agency-bodies.json and
+  apps/desktop/src/data/agency-index.json) is derived from:
+    msitarzewski/agency-agents  —  https://github.com/msitarzewski/agency-agents
+    License: MIT
+  The agent prompts are redistributed here under the MIT License. Regenerate
+  from an upstream checkout with: scripts/import_agency.py
+
+The following components are DECIDED dependencies of the architecture and are
+NOT bundled here — install them per their own licenses to run the full system:
+Tauri, React, Temporal, Gitea, Ollama, Memgraph, Qdrant, Cognee, OpenHands,
+Aider, LangGraph.
