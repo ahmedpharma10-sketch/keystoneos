@@ -84,9 +84,19 @@ def _matches_any(path: str, globs: Sequence[str]) -> bool:
     return any(fnmatch.fnmatch(path, g) for g in globs)
 
 
+def _is_safe_path(path: str) -> bool:
+    # Deny directory traversal and absolute paths
+    if ".." in path or path.startswith("/"):
+        return False
+    return True
+
 def evaluate(token: CapabilityToken, action: Action, ctx: PolicyContext) -> Decision:
     """Allow/deny an action under a capability token and run context."""
     reasons: List[str] = []
+
+    for p in action.paths:
+        if not _is_safe_path(p):
+            return Decision(False, [f"'{p}' contains unsafe directory traversal or is absolute"])
 
     if token.capability not in VALID_CAPABILITIES:
         return Decision(False, [f"unknown capability '{token.capability}'"])

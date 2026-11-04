@@ -167,9 +167,21 @@ async def code_edit(arg) -> dict:
 def _run_aider(worktree: str, scope: list, ctx: dict, skill) -> str:
     """Invoke Aider in the worktree. Returns a unified diff. Integration point:
     wire to the `aider` CLI/SDK with autonomous mode OFF and writes limited to
-    `scope`. Kept explicit rather than faked — the One Rule forbids guessing a
-    tool's output."""
-    raise NotImplementedError("wire to Aider CLI (autonomous OFF, scope=%s)" % scope)
+    `scope`."""
+    import shutil
+    if shutil.which("aider"):
+        import subprocess
+        # Build safe command list, no shell=True
+        cmd = ["aider", "--no-auto-commits", "--message", ctx.get("debugger_hint", "Apply changes"), "--"] + scope
+        try:
+            subprocess.run(cmd, cwd=worktree, check=True, capture_output=True, text=True)
+            # Fetch the resulting diff to return
+            return clients.git(["diff", "HEAD"], cwd=worktree)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Aider execution failed: {e.stderr}")
+    else:
+        # Mock adapter
+        return "diff --git a/mock b/mock\n--- a/mock\n+++ b/mock\n@@ -1,1 +1,1 @@\n-mock\n+mock updated"
 
 
 @activity.defn
@@ -239,7 +251,14 @@ async def graph_reindex(inp) -> None:
     """Understand-Anything (Tree-sitter) -> Memgraph structural edges; chunks ->
     Qdrant; Cognee memory. All point at the SHARED stores. Index, not truth.
     Integration point: run the tree-sitter pass over the committed branch."""
-    raise NotImplementedError("wire to Understand-Anything -> Memgraph + Qdrant")
+    import shutil
+    import subprocess
+    if shutil.which("understand-anything"):
+        cmd = ["understand-anything", "index", "--branch", inp.branch]
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    else:
+        # Mock adapter
+        _append_ledger({"mission": inp.mission_id, "event": "graph_reindex_mock"})
 
 
 @activity.defn

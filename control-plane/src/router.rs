@@ -62,10 +62,15 @@ impl Router {
         }
 
         candidates.sort_by(|a, b| {
-            // Resident first; then smaller for embed/review, faster otherwise.
-            let key_a = (!a.resident as u8, if prefer_small { a.vram_gb } else { -a.tokens_per_sec });
-            let key_b = (!b.resident as u8, if prefer_small { b.vram_gb } else { -b.tokens_per_sec });
-            key_a.partial_cmp(&key_b).unwrap()
+            if prefer_small {
+                // For small jobs, smallest VRAM is more important than residency
+                a.vram_gb.partial_cmp(&b.vram_gb).unwrap()
+            } else {
+                // Resident first; then faster
+                let key_a = (!a.resident as u8, -a.tokens_per_sec);
+                let key_b = (!b.resident as u8, -b.tokens_per_sec);
+                key_a.partial_cmp(&key_b).unwrap()
+            }
         });
         candidates.first().copied()
     }

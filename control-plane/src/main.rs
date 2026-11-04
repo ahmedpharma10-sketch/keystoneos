@@ -75,8 +75,16 @@ async fn handle_socket(mut socket: WebSocket) {
             match serde_json::from_str::<Command>(&txt) {
                 Ok(Command::RunMission { source }) => {
                     tracing::info!("run_mission requested (source={:?})", source);
-                    // TODO(integration): start MissionWorkflow via the Temporal
-                    // client, then stream its activity events back as CpEvents.
+                    // Mock integration: send a series of simulated timeline events
+                    let mock_events = vec![
+                        r#"{"type": "timeline:add", "event": {"id": "1", "ts": "10:00:00", "description": "Mission requested", "files": []}}"#,
+                        r#"{"type": "timeline:add", "event": {"id": "2", "ts": "10:00:02", "description": "Acquired lease", "files": []}}"#,
+                        r#"{"type": "timeline:add", "event": {"id": "3", "ts": "10:00:05", "description": "Mission complete", "files": []}}"#,
+                        r#"{"type": "mission", "mission": {"id": "mock-001", "status": "complete", "branch": "mock-branch", "attempt": 1, "maxAttempts": 3, "request": "Mock run", "activity": "done"}}"#
+                    ];
+                    for e in mock_events {
+                        let _ = socket.send(Message::Text(e.to_string())).await;
+                    }
                 }
                 Err(e) => tracing::warn!("bad command frame: {e}"),
             }
