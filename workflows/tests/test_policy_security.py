@@ -19,5 +19,22 @@ class TestPolicySecurity(unittest.TestCase):
         d = evaluate(t, Action("write_files", ["src/main.py"]), PolicyContext())
         self.assertTrue(d)
 
+    def test_windows_absolute_path_denied(self):
+        t = CapabilityToken(mission_id="ks-1", tool="aider", capability="write_files", scope=["*"], expires_at="2030-01-01T00:00:00Z")
+        self.assertFalse(evaluate(t, Action("write_files", ["C:\\Windows\\System32"]), PolicyContext()))
+        self.assertFalse(evaluate(t, Action("write_files", ["D:/secrets/token"]), PolicyContext()))
+
+    def test_env_files_denied(self):
+        t = CapabilityToken(mission_id="ks-1", tool="aider", capability="write_files", scope=["*"], expires_at="2030-01-01T00:00:00Z")
+        self.assertFalse(evaluate(t, Action("write_files", [".env"]), PolicyContext()))
+        self.assertFalse(evaluate(t, Action("write_files", [".env.production"]), PolicyContext()))
+        self.assertFalse(evaluate(t, Action("write_files", ["backend/.env"]), PolicyContext()))
+
+    def test_scope_star_does_not_override_protected(self):
+        t = CapabilityToken(mission_id="ks-1", tool="aider", capability="write_files", scope=["*"], expires_at="2030-01-01T00:00:00Z")
+        d = evaluate(t, Action("write_files", [".env"]), PolicyContext())
+        self.assertFalse(d)
+        self.assertIn("is a forbidden path", d.reasons[0])
+
 if __name__ == "__main__":
     unittest.main()

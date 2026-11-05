@@ -23,7 +23,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 
-from temporalio import activity
+from temporalio import activity, exceptions
 
 from lib import clients, config
 from lib.leases import LeaseManager
@@ -64,7 +64,7 @@ async def acquire_workspace_lease(mission_id: str) -> str:
     lease = _LEASES.acquire(mission_id, "write", "/")
     if lease is None:
         # Queued behind another mission on this scope — Temporal will retry.
-        raise activity.ApplicationError("scope busy — mission queued", non_retryable=False)
+        raise exceptions.ApplicationError("scope busy — mission queued", non_retryable=False)
     _LEASE_TOKENS[mission_id] = lease.token
     return lease.token
 
@@ -157,7 +157,7 @@ async def code_edit(arg) -> dict:
     token = _mint(mission_id, "aider", "write_files", scope)
     decision = evaluate(token, Action("write_files", scope), PolicyContext(airgap=config.AIRGAP))
     if not decision:
-        raise activity.ApplicationError(f"policy denied edit: {decision.reasons}", non_retryable=True)
+        raise exceptions.ApplicationError(f"policy denied edit: {decision.reasons}", non_retryable=True)
 
     patch = _run_aider(_edit_worktree(mission_id), scope, ctx, arg.get("skill"))
     return {"patch": patch, "files": scope,
