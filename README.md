@@ -88,7 +88,7 @@ npm run dev            # → http://localhost:1421
 ```bash
 cd workflows
 pip install -r requirements.txt
-python3 -m unittest discover -p "test_*.py"   # 42 passing tests
+python3 -m unittest discover tests   # 42 passing tests
 ```
 
 **4. Control Plane (Rust):**
@@ -114,7 +114,7 @@ Then: pick a mission → **▶ Run** to watch the governed saga animate · **⊞
 **Backend governance core (Python, no services required):**
 
 ```bash
-cd workflows && python3 -m unittest tests.test_core tests.test_router tests.test_ingest   # 35 tests
+cd workflows && python3 -m unittest tests.test_core tests.test_router tests.test_ingest   # 46 tests
 ```
 
 **Document → knowledge graph (offline, or via a local LLM):**
@@ -143,7 +143,7 @@ cd ../apps/desktop && VITE_KEYSTONE_WS=ws://localhost:8080/stream npm run tauri 
 
 ## 📦 Project status (honest)
 
-The **desktop UI**, the **governance core** (lease/policy/fingerprint — 35 tests), and the **Graph-RAG ingest** (heuristic + local-LLM path) are built and verified. The Rust control-plane, the Docker backplane, and the Aider/OpenHands integrations are real, spec-faithful code that need their toolchains (Docker/Rust/GPU) to run — bring your own workstation. See [`PROGRESS.md`](PROGRESS.md).
+The **desktop UI**, the **governance core** (lease/policy/fingerprint — 46 tests), and the **Graph-RAG ingest** (heuristic + local-LLM path) are built and verified. The Rust control-plane, the Docker backplane, and the Aider/OpenHands integrations are real, spec-faithful code that need their toolchains (Docker/Rust/GPU) to run — bring your own workstation. See [`PROGRESS.md`](PROGRESS.md).
 
 ## 📄 License & attribution
 

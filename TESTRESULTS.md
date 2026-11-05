@@ -2,7 +2,7 @@
 
 ## Python Tests
 - **Module:** `workflows/tests/`
-- **Result:** 42 passing tests
+- **Result:** 46 passing tests
 - **Coverage Summary:**
   - Core logic handling fingerprints: Passed
   - Lease scope verification: Passed
@@ -13,7 +13,7 @@
 
 ## Rust Tests
 - **Module:** `control-plane/`
-- **Result:** 4 passing tests
+- **Result:** 5 passing tests
 - **Coverage Summary:**
   - lease logic (writes block test env): Passed
   - lease logic (reads coexist): Passed

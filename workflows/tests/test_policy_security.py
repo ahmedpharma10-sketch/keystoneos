@@ -38,3 +38,11 @@ class TestPolicySecurity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+    def test_advanced_path_bypasses_denied(self):
+        t = CapabilityToken(mission_id="ks-1", tool="aider", capability="write_files", scope=["*"], expires_at="2030-01-01T00:00:00Z")
+        self.assertFalse(evaluate(t, Action("write_files", ["c:rel.txt"]), PolicyContext()))
+        self.assertFalse(evaluate(t, Action("write_files", ["%SYSTEMROOT%/x"]), PolicyContext()))
+        self.assertFalse(evaluate(t, Action("write_files", ["~/x"]), PolicyContext()))
+        self.assertFalse(evaluate(t, Action("write_files", ["src/.env "]), PolicyContext()))
+        self.assertFalse(evaluate(t, Action("write_files", [".env::$DATA"]), PolicyContext()))

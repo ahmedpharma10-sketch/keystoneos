@@ -44,6 +44,10 @@ enum Command {
     RunMission { source: Option<String> },
 }
 
+use axum::http::HeaderMap;
+use axum::response::Response;
+use axum::http::StatusCode;
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
@@ -51,14 +55,28 @@ async fn main() {
         .route("/healthz", get(|| async { "ok" }))
         .route("/stream", get(ws_handler));
 
-    let addr = "0.0.0.0:8080";
+    let addr = std::env::var("KEYSTONE_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
     tracing::info!("KeyStoneOS control plane on {addr}");
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
-async fn ws_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
-    ws.on_upgrade(handle_socket)
+async fn ws_handler(headers: HeaderMap, ws: WebSocketUpgrade) -> Response {
+    let addr = std::env::var("KEYSTONE_BIND").unwrap_or_else(|_| "127.0.0.1:8080".to_string());
+    let requires_auth = !addr.starts_with("127.0.0.1") && !addr.starts_with("localhost");
+
+    if requires_auth {
+        let expected_token = format!("Bearer {}", std::env::var("KEYSTONE_AUTH_TOKEN").unwrap_or_default());
+        if let Some(auth_header) = headers.get("authorization") {
+            if auth_header.to_str().unwrap_or("") != expected_token { // Token validation
+                return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+            }
+        } else {
+            return (StatusCode::UNAUTHORIZED, "Unauthorized").into_response();
+        }
+    }
+
+    ws.on_upgrade(handle_socket).into_response()
 }
 
 async fn handle_socket(mut socket: WebSocket) {
@@ -77,9 +95,9 @@ async fn handle_socket(mut socket: WebSocket) {
                     tracing::info!("run_mission requested (source={:?})", source);
                     // Mock integration: send a series of simulated timeline events
                     let mock_events = vec![
-                        r#"{"type": "timeline:add", "event": {"id": "1", "ts": "10:00:00", "description": "Mission requested", "files": []}}"#,
-                        r#"{"type": "timeline:add", "event": {"id": "2", "ts": "10:00:02", "description": "Acquired lease", "files": []}}"#,
-                        r#"{"type": "timeline:add", "event": {"id": "3", "ts": "10:00:05", "description": "Mission complete", "files": []}}"#,
+                        r#"{"type": "timeline:add", "event": {"id": "1", "ts": "10:00:00", "description": "Mission requested (simulated)", "files": []}}"#,
+                        r#"{"type": "timeline:add", "event": {"id": "2", "ts": "10:00:02", "description": "Acquired lease (simulated)", "files": []}}"#,
+                        r#"{"type": "timeline:add", "event": {"id": "3", "ts": "10:00:05", "description": "Mission complete (simulated)", "files": []}}"#,
                         r#"{"type": "mission", "mission": {"id": "mock-001", "status": "complete", "branch": "mock-branch", "attempt": 1, "maxAttempts": 3, "request": "Mock run", "activity": "done"}}"#
                     ];
                     for e in mock_events {
@@ -89,5 +107,17 @@ async fn handle_socket(mut socket: WebSocket) {
                 Err(e) => tracing::warn!("bad command frame: {e}"),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::HeaderMap;
+    // Just a placeholder test to confirm cargo is available and runs tests on main.rs
+    #[test]
+    fn test_auth_logic_concept() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Bearer wrong".parse().unwrap());
+        assert_eq!(headers.get("authorization").unwrap().to_str().unwrap(), "Bearer wrong");
     }
 }

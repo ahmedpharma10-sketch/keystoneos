@@ -180,8 +180,10 @@ def _run_aider(worktree: str, scope: list, ctx: dict, skill) -> str:
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Aider execution failed: {e.stderr}")
     else:
-        # Mock adapter
-        return "diff --git a/mock b/mock\n--- a/mock\n+++ b/mock\n@@ -1,1 +1,1 @@\n-mock\n+mock updated"
+        import os
+        if os.environ.get("KEYSTONE_MOCK") == "1":
+            return "MOCKED: diff --git a/mock b/mock\n--- a/mock\n+++ b/mock\n@@ -1,1 +1,1 @@\n-mock\n+mock updated"
+        raise RuntimeError("aider CLI not found. Install aider or set KEYSTONE_MOCK=1")
 
 
 @activity.defn
@@ -257,8 +259,11 @@ async def graph_reindex(inp) -> None:
         cmd = ["understand-anything", "index", "--branch", inp.branch]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
     else:
-        # Mock adapter
-        _append_ledger({"mission": inp.mission_id, "event": "graph_reindex_mock"})
+        import os
+        if os.environ.get("KEYSTONE_MOCK") == "1":
+            _append_ledger({"mission": inp.mission_id, "event": "graph_reindex_mock", "mock": True})
+        else:
+            raise RuntimeError("understand-anything CLI not found. Install it or set KEYSTONE_MOCK=1")
 
 
 @activity.defn
