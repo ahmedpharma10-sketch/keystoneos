@@ -36,13 +36,35 @@ class TestPolicySecurity(unittest.TestCase):
         self.assertFalse(d)
         self.assertIn("is a forbidden path", d.reasons[0])
 
-if __name__ == "__main__":
-    unittest.main()
-
     def test_advanced_path_bypasses_denied(self):
         t = CapabilityToken(mission_id="ks-1", tool="aider", capability="write_files", scope=["*"], expires_at="2030-01-01T00:00:00Z")
-        self.assertFalse(evaluate(t, Action("write_files", ["c:rel.txt"]), PolicyContext()))
-        self.assertFalse(evaluate(t, Action("write_files", ["%SYSTEMROOT%/x"]), PolicyContext()))
-        self.assertFalse(evaluate(t, Action("write_files", ["~/x"]), PolicyContext()))
-        self.assertFalse(evaluate(t, Action("write_files", ["src/.env "]), PolicyContext()))
-        self.assertFalse(evaluate(t, Action("write_files", [".env::$DATA"]), PolicyContext()))
+        bypasses = [
+            'c:rel.txt',
+            'C:rel.txt',
+            'C:\\x',
+            'C:/x',
+            '\\\\server\\share\\x',
+            '%SYSTEMROOT%/x',
+            '~/x',
+            '.env::$DATA',
+            'src/.env ',
+            'src/.env  ',
+            'src/.env.',
+            'src/.env\\',
+            'src/.env/',
+            '.env ',
+            '.ENV',
+            'src\\.env',
+            'src/.Env',
+            'src/.env.production ',
+            'secrets/key ',
+            'SECRETS/key',
+            'a.PEM',
+            'a.pem ',
+        ]
+        for p in bypasses:
+            with self.subTest(path=p):
+                self.assertFalse(evaluate(t, Action("write_files", [p]), PolicyContext()))
+
+if __name__ == "__main__":
+    unittest.main()

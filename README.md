@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e.svg)](LICENSE)
 ![Air-gapped](https://img.shields.io/badge/network-airgapped%20by%20default-0ea5e9)
-![Tests](https://img.shields.io/badge/backend%20tests-35%20passing-3fb950)
+![Tests](https://img.shields.io/badge/backend%20tests-47%20passing-3fb950)
 ![Stack](https://img.shields.io/badge/Tauri%20%2B%20React-Rust%20%2B%20Python-7c5cff)
 ![Local LLM](https://img.shields.io/badge/LLM-Ollama%20(local)-f97316)
 
@@ -88,7 +88,7 @@ npm run dev            # → http://localhost:1421
 ```bash
 cd workflows
 pip install -r requirements.txt
-python3 -m unittest discover tests   # 42 passing tests
+python3 -m unittest discover tests   # 47 tests (also: python3 -m pytest -q). Run from workflows/ only
 ```
 
 **4. Control Plane (Rust):**
@@ -114,7 +114,7 @@ Then: pick a mission → **▶ Run** to watch the governed saga animate · **⊞
 **Backend governance core (Python, no services required):**
 
 ```bash
-cd workflows && python3 -m unittest tests.test_core tests.test_router tests.test_ingest   # 46 tests
+cd workflows && python3 -m unittest discover tests   # 47 tests; must be run from workflows/ (pytest from the repo root fails collection: "No module named activities")
 ```
 
 **Document → knowledge graph (offline, or via a local LLM):**
@@ -143,7 +143,7 @@ cd ../apps/desktop && VITE_KEYSTONE_WS=ws://localhost:8080/stream npm run tauri 
 
 ## 📦 Project status (honest)
 
-The **desktop UI**, the **governance core** (lease/policy/fingerprint — 46 tests), and the **Graph-RAG ingest** (heuristic + local-LLM path) are built and verified. The Rust control-plane, the Docker backplane, and the Aider/OpenHands integrations are real, spec-faithful code that need their toolchains (Docker/Rust/GPU) to run — bring your own workstation. See [`PROGRESS.md`](PROGRESS.md).
+The **desktop UI**, the **governance core** (lease/policy/fingerprint — 47 Python tests, run from workflows/), and the **Graph-RAG ingest** (heuristic + local-LLM path) are built and verified. The Rust control-plane, the Docker backplane, and the Aider/OpenHands integrations are real, spec-faithful code that need their toolchains (Docker/Rust/GPU) to run — bring your own workstation. See [`PROGRESS.md`](PROGRESS.md).
 
 ## 📄 License & attribution
 

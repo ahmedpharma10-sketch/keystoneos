@@ -85,37 +85,34 @@ class Decision:
         return self.allow
 
 
+def _normalize_path(path: str) -> str:
+    """Normalise a path ONCE: forward slashes, per-component trailing dots/spaces
+    stripped (Windows ignores them), empty components dropped, case-folded.
+    Every policy check must use this value, never the raw string."""
+    parts = [c.rstrip(". ") for c in path.replace(chr(92), "/").split("/")]
+    return "/".join(c for c in parts if c).casefold()
+
+
 def _matches_any(path: str, globs: Sequence[str]) -> bool:
-    return any(fnmatch.fnmatch(path, g) for g in globs)
+    path = _normalize_path(path)
+    return any(fnmatch.fnmatchcase(path, g.casefold()) for g in globs)
 
 
 def _is_safe_path(path: str) -> bool:
-    # Normalize trailing dots and spaces
-    path = path.rstrip(". ")
-
-    if ".." in path or path.startswith("/"):
+    """Reject anything absolute, drive-qualified, home/env-expanded, traversing
+    or carrying an alternate data stream. Any colon is rejected outright, which
+    covers drive-absolute, drive-relative (c:rel.txt) and ::$DATA forms."""
+    if ":" in path:
         return False
-    if path.startswith("~") or path.startswith("%"):
+    if ".." in path:
         return False
-
-    # Check for windows paths or alternate data streams by restricting ':'
-    colon_idx = path.find(":")
-    if colon_idx != -1:
-        if colon_idx != 1:
-            return False
-        if not path[0].isalpha():
-            return False
-
-    # Deny Windows absolute paths starting with \
-    if path.startswith(chr(92)):
+    if path.startswith(("/", chr(92), "~", "%")):
         return False
-
-    # Check for C:\... or C:/...
-    if len(path) >= 3 and path[1] == ":" and (path[2] == "/" or path[2] == chr(92)):
-        if path[0].isalpha():
-            return False
-
+    if not _normalize_path(path):
+        return False
     return True
+
+
 def evaluate(token: CapabilityToken, action: Action, ctx: PolicyContext) -> Decision:
     """Allow/deny an action under a capability token and run context."""
     reasons: List[str] = []
@@ -147,7 +144,7 @@ def evaluate(token: CapabilityToken, action: Action, ctx: PolicyContext) -> Deci
         if not _matches_any(p, token.scope):
             return Decision(False, [f"'{p}' is outside capability scope {list(token.scope)}"])
         # §3: no editing a file currently under test.
-        if action.capability in ("write_files", "delete_files") and p in ctx.files_under_test:
+        if action.capability in ("write_files", "delete_files") and _normalize_path(p) in {_normalize_path(f) for f in ctx.files_under_test}:
             return Decision(False, [f"'{p}' is under test — cannot mutate (§3)"])
 
     # §8: bulk deletes need human approval.
