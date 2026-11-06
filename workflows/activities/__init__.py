@@ -23,7 +23,7 @@ import json
 import os
 from datetime import datetime, timedelta, timezone
 
-from temporalio import activity
+from temporalio import activity, exceptions
 
 from lib import clients, config
 from lib.leases import LeaseManager
@@ -64,7 +64,7 @@ async def acquire_workspace_lease(mission_id: str) -> str:
     lease = _LEASES.acquire(mission_id, "write", "/")
     if lease is None:
         # Queued behind another mission on this scope — Temporal will retry.
-        raise activity.ApplicationError("scope busy — mission queued", non_retryable=False)
+        raise exceptions.ApplicationError("scope busy — mission queued", non_retryable=False)
     _LEASE_TOKENS[mission_id] = lease.token
     return lease.token
 
@@ -157,7 +157,7 @@ async def code_edit(arg) -> dict:
     token = _mint(mission_id, "aider", "write_files", scope)
     decision = evaluate(token, Action("write_files", scope), PolicyContext(airgap=config.AIRGAP))
     if not decision:
-        raise activity.ApplicationError(f"policy denied edit: {decision.reasons}", non_retryable=True)
+        raise exceptions.ApplicationError(f"policy denied edit: {decision.reasons}", non_retryable=True)
 
     patch = _run_aider(_edit_worktree(mission_id), scope, ctx, arg.get("skill"))
     return {"patch": patch, "files": scope,
@@ -167,9 +167,23 @@ async def code_edit(arg) -> dict:
 def _run_aider(worktree: str, scope: list, ctx: dict, skill) -> str:
     """Invoke Aider in the worktree. Returns a unified diff. Integration point:
     wire to the `aider` CLI/SDK with autonomous mode OFF and writes limited to
-    `scope`. Kept explicit rather than faked — the One Rule forbids guessing a
-    tool's output."""
-    raise NotImplementedError("wire to Aider CLI (autonomous OFF, scope=%s)" % scope)
+    `scope`."""
+    import shutil
+    if shutil.which("aider"):
+        import subprocess
+        # Build safe command list, no shell=True
+        cmd = ["aider", "--no-auto-commits", "--message", ctx.get("debugger_hint", "Apply changes"), "--"] + scope
+        try:
+            subprocess.run(cmd, cwd=worktree, check=True, capture_output=True, text=True)
+            # Fetch the resulting diff to return
+            return clients.git(["diff", "HEAD"], cwd=worktree)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Aider execution failed: {e.stderr}")
+    else:
+        import os
+        if os.environ.get("KEYSTONE_MOCK") == "1":
+            return "MOCKED: diff --git a/mock b/mock\n--- a/mock\n+++ b/mock\n@@ -1,1 +1,1 @@\n-mock\n+mock updated"
+        raise RuntimeError("aider CLI not found. Install aider or set KEYSTONE_MOCK=1")
 
 
 @activity.defn
@@ -239,7 +253,17 @@ async def graph_reindex(inp) -> None:
     """Understand-Anything (Tree-sitter) -> Memgraph structural edges; chunks ->
     Qdrant; Cognee memory. All point at the SHARED stores. Index, not truth.
     Integration point: run the tree-sitter pass over the committed branch."""
-    raise NotImplementedError("wire to Understand-Anything -> Memgraph + Qdrant")
+    import shutil
+    import subprocess
+    if shutil.which("understand-anything"):
+        cmd = ["understand-anything", "index", "--branch", inp.branch]
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
+    else:
+        import os
+        if os.environ.get("KEYSTONE_MOCK") == "1":
+            _append_ledger({"mission": inp.mission_id, "event": "graph_reindex_mock", "mock": True})
+        else:
+            raise RuntimeError("understand-anything CLI not found. Install it or set KEYSTONE_MOCK=1")
 
 
 @activity.defn

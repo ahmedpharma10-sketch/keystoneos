@@ -10,6 +10,7 @@ mirrored by the Rust control-plane, and is fully unit-testable.
 """
 
 from __future__ import annotations
+import re
 
 import fnmatch
 from dataclasses import dataclass, field
@@ -26,6 +27,10 @@ FORBIDDEN_GLOBS = (
     "*.pem",
     "*.key",
     "**/id_rsa*",
+    ".env",
+    ".env.*",
+    "**/.env",
+    "**/.env.*",
 )
 
 VALID_CAPABILITIES = {"read_files", "write_files", "delete_files", "run_tests", "network"}
@@ -84,9 +89,40 @@ def _matches_any(path: str, globs: Sequence[str]) -> bool:
     return any(fnmatch.fnmatch(path, g) for g in globs)
 
 
+def _is_safe_path(path: str) -> bool:
+    # Normalize trailing dots and spaces
+    path = path.rstrip(". ")
+
+    if ".." in path or path.startswith("/"):
+        return False
+    if path.startswith("~") or path.startswith("%"):
+        return False
+
+    # Check for windows paths or alternate data streams by restricting ':'
+    colon_idx = path.find(":")
+    if colon_idx != -1:
+        if colon_idx != 1:
+            return False
+        if not path[0].isalpha():
+            return False
+
+    # Deny Windows absolute paths starting with \
+    if path.startswith(chr(92)):
+        return False
+
+    # Check for C:\... or C:/...
+    if len(path) >= 3 and path[1] == ":" and (path[2] == "/" or path[2] == chr(92)):
+        if path[0].isalpha():
+            return False
+
+    return True
 def evaluate(token: CapabilityToken, action: Action, ctx: PolicyContext) -> Decision:
     """Allow/deny an action under a capability token and run context."""
     reasons: List[str] = []
+
+    for p in action.paths:
+        if not _is_safe_path(p):
+            return Decision(False, [f"'{p}' contains unsafe directory traversal or is absolute"])
 
     if token.capability not in VALID_CAPABILITIES:
         return Decision(False, [f"unknown capability '{token.capability}'"])

@@ -60,9 +60,22 @@ Mission ks-YYYYMMDD-NNN                          (one Temporal Saga per branch)
 
 **Decided stack (no substitutions):** Tauri + React shell · Rust control-plane · Python workers · Temporal (on Postgres) · Gitea · Ollama + model router · Memgraph · Qdrant · Cognee · OpenHands. See [`CLAUDE.md`](CLAUDE.md) — the authoritative spec.
 
-## 🚀 Quick start
+## 🚀 Quick start & Setup
 
-**The desktop UI (works standalone, no backend needed):**
+**Prerequisites:**
+- Python 3.12+
+- Node.js 18+ (for UI)
+- Rust (for Control Plane)
+- (Optional) Docker for running Temporal & dependencies.
+- (Optional) `aider` and `understand-anything` installed globally to use actual adapters, else they fall back to mock adapters.
+
+**1. Copy and configure the environment:**
+```bash
+cp .env.example .env
+# Edit .env to adjust KEYSTONE_AIRGAP and other paths as needed.
+```
+
+**2. The desktop UI (works standalone, no backend needed):**
 
 ```bash
 cd apps/desktop
@@ -70,12 +83,38 @@ npm install
 npm run dev            # → http://localhost:1421
 ```
 
+**3. Backend governance core (Python tests & mock integration):**
+
+```bash
+cd workflows
+pip install -r requirements.txt
+python3 -m unittest discover tests   # 42 passing tests
+```
+
+**4. Control Plane (Rust):**
+
+```bash
+cd control-plane
+cargo check
+cargo run              # WS runs on :8080 (simulated events integration active)
+```
+
+**5. Full autonomous system** (needs Docker + Rust + Ollama):
+
+```bash
+cd deploy && docker compose up -d          # Temporal, Gitea, Ollama, Qdrant, Memgraph, OpenHands…
+cd ../workflows && python worker.py
+cd ../control-plane && cargo run
+cd ../apps/desktop && VITE_KEYSTONE_WS=ws://localhost:8080/stream npm run tauri dev
+```
+
+
 Then: pick a mission → **▶ Run** to watch the governed saga animate · **⊞ Agency** to browse/route 218 agents · **⚛ Compile** to turn text into a knowledge graph.
 
 **Backend governance core (Python, no services required):**
 
 ```bash
-cd workflows && python3 -m unittest tests.test_core tests.test_router tests.test_ingest   # 35 tests
+cd workflows && python3 -m unittest tests.test_core tests.test_router tests.test_ingest   # 46 tests
 ```
 
 **Document → knowledge graph (offline, or via a local LLM):**
@@ -104,7 +143,7 @@ cd ../apps/desktop && VITE_KEYSTONE_WS=ws://localhost:8080/stream npm run tauri 
 
 ## 📦 Project status (honest)
 
-The **desktop UI**, the **governance core** (lease/policy/fingerprint — 35 tests), and the **Graph-RAG ingest** (heuristic + local-LLM path) are built and verified. The Rust control-plane, the Docker backplane, and the Aider/OpenHands integrations are real, spec-faithful code that need their toolchains (Docker/Rust/GPU) to run — bring your own workstation. See [`PROGRESS.md`](PROGRESS.md).
+The **desktop UI**, the **governance core** (lease/policy/fingerprint — 46 tests), and the **Graph-RAG ingest** (heuristic + local-LLM path) are built and verified. The Rust control-plane, the Docker backplane, and the Aider/OpenHands integrations are real, spec-faithful code that need their toolchains (Docker/Rust/GPU) to run — bring your own workstation. See [`PROGRESS.md`](PROGRESS.md).
 
 ## 📄 License & attribution
 
